@@ -17,24 +17,24 @@ import Charts
 //グラフに描画する要素数に関するenum
 enum GraphXLabelList : Int {
     
-    case One = 1
-    case Two = 2
-    case Three = 3
-    case Four = 4
-    case Five = 5
+    case one = 1
+    case two = 2
+    case three = 3
+    case four = 4
+    case five = 5
     
-    static func getXLabelList(count: Int) -> [String] {
+    static func getXLabelList(_ count: Int) -> [String] {
         
         var xLabels: [String] = []
         
         //※この画面に遷移したらデータが登録されるので0は考えなくて良い
-        if count == self.One.rawValue {
+        if count == self.one.rawValue {
             xLabels = ["最新"]
-        } else if count == self.Two.rawValue {
+        } else if count == self.two.rawValue {
             xLabels = ["最新", "2つ前"]
-        } else if count == self.Three.rawValue {
+        } else if count == self.three.rawValue {
             xLabels = ["最新", "2つ前", "3つ前"]
-        } else if count == self.Four.rawValue {
+        } else if count == self.four.rawValue {
             xLabels = ["最新", "2つ前", "3つ前", "4つ前"]
         } else {
             xLabels = ["最新", "2つ前", "3つ前", "4つ前", "5つ前"]
@@ -47,12 +47,12 @@ enum GraphXLabelList : Int {
 //日付の相互変換用
 struct ChangeDate {
     
-    //NSDate → Stringへの変換
-    static func convertNSDateToString (date: NSDate) -> String {
-        let dateFormatter: NSDateFormatter = NSDateFormatter()
-        dateFormatter.locale = NSLocale(localeIdentifier: "ja_JP")
+    //Date → Stringへの変換
+    static func convertDateToString (_ date: Date) -> String {
+        let dateFormatter: DateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "ja_JP")
         dateFormatter.dateFormat = "yyyy/MM/dd"
-        let dateString: String = dateFormatter.stringFromDate(date)
+        let dateString: String = dateFormatter.string(from: date)
         return dateString
     }
 }
@@ -72,8 +72,8 @@ class ScoreController: UIViewController ,UITableViewDelegate, UITableViewDataSou
     //テーブルデータ表示用に一時的にすべてのfetchデータを格納する
     var scoreArrayForCell: NSMutableArray = []
     
-    //折れ線グラフ用のメンバ変数
-    var lineChartView: LineChartView = LineChartView()
+    //棒グラフ用のメンバ変数
+    var barChartView: BarChartView = BarChartView()
     
     //Outlet接続した部品一覧
     @IBOutlet var resultDisplayLabel: UILabel!
@@ -82,18 +82,18 @@ class ScoreController: UIViewController ,UITableViewDelegate, UITableViewDataSou
     @IBOutlet var resultGraphView: UIView!
     
     //画面出現中のタイミングに読み込まれる処理
-    override func viewWillAppear(animated: Bool) {
+    override func viewWillAppear(_ animated: Bool) {
         
         //QuizControllerから渡された値を出力
-        self.resultDisplayLabel.text = "正解数：合計" + String(self.correctProblemNumber) + "問 / 経過時間：" + self.totalSeconds + "秒"
+        resultDisplayLabel.text = "正解数：合計" + String(correctProblemNumber) + "問 / 経過時間：" + totalSeconds + "秒"
         
         //Realmから履歴データを呼び出す
-        self.fetchHistoryDataFromRealm()
+        fetchHistoryDataFromRealm()
         
         //セグメントコントロールの初期値を設定する
-        self.analyticsSegmentControl.selectedSegmentIndex = 0
-        self.resultHistoryTable.alpha = 1
-        self.resultGraphView.alpha = 0
+        analyticsSegmentControl.selectedSegmentIndex = 0
+        resultHistoryTable.alpha = 1
+        resultGraphView.alpha = 0
     }
     
     override func viewDidLoad() {
@@ -104,33 +104,45 @@ class ScoreController: UIViewController ,UITableViewDelegate, UITableViewDataSou
         self.navigationItem.title = "ゲーム結果"
                 
         //テーブルビューのデリゲート設定
-        self.resultHistoryTable.delegate = self
-        self.resultHistoryTable.dataSource = self
+        resultHistoryTable.delegate = self
+        resultHistoryTable.dataSource = self
         
         //Xibのクラスを読み込む
         let nibDefault: UINib = UINib(nibName: "scoreCell", bundle: nil)
-        self.resultHistoryTable.registerNib(nibDefault, forCellReuseIdentifier: "scoreCell")
+        resultHistoryTable.register(nibDefault, forCellReuseIdentifier: "scoreCell")
         
         //データを成型して表示する（変数xLabelsとunitSoldに入る配列の要素数は合わせないと落ちる）
         let unitsSold: [Double] = GameScore.fetchGraphGameScore()
         let xLabels = GraphXLabelList.getXLabelList(unitsSold.count)
+        let xLabelsCount = xLabels.count
         
-        var dataEntries: [ChartDataEntry] = []
+        var dataEntries: [BarChartDataEntry] = []
         
-        for i in 0..<xLabels.count {
-            let dataEntry = ChartDataEntry(value: unitsSold[i], xIndex: i)
+        for i in 0..<xLabelsCount {
+            
+            print(unitsSold[i])
+            
+            let dataEntry = BarChartDataEntry(x: Double(i), y: Double(unitsSold[i]))
             dataEntries.append(dataEntry)
         }
         
         //グラフに描画するデータを表示する
-        let lineChartDataSet = LineChartDataSet(yVals: dataEntries, label: "ここ最近の得点グラフ")
-        let lineChartData = LineChartData(xVals: xLabels, dataSet: lineChartDataSet)
-        
-        //LineChartViewのインスタンスに値を追加する
-        self.lineChartView.data = lineChartData
-        
+        let barChartDataSet = BarChartDataSet(values: dataEntries, label: "直近5回の得点を表示しています")
+        let barChartData = BarChartData(dataSet: barChartDataSet)
+
+        //BarChartViewのインスタンスに値を追加する
+        // (参考) バーチャートの装飾参考
+        // http://stackoverflow.com/questions/40323288/how-to-set-x-axis-labels-with-ios-charts
+        // https://fussan-blog.com/swift3-charts/
+
+        barChartView.chartDescription?.text = "得点推移グラフ"
+        barChartView.animate(xAxisDuration: 1.0, yAxisDuration: 1.0)
+        barChartView.data = barChartData
+        barChartView.xAxis.valueFormatter = IndexAxisValueFormatter(values: xLabels)
+        barChartView.xAxis.granularity = 1
+
         //UIViewの中にLineChartViewを追加する
-        self.resultGraphView.addSubview(self.lineChartView)
+        resultGraphView.addSubview(barChartView)
     }
 
     //レイアウト処理が完了した際の処理
@@ -138,41 +150,41 @@ class ScoreController: UIViewController ,UITableViewDelegate, UITableViewDataSou
         super.viewDidLayoutSubviews()
         
         //レイアウトの再配置
-        self.lineChartView.frame = CGRectMake(0, 0, self.resultGraphView.frame.width, self.resultGraphView.frame.height)
+        barChartView.frame = CGRect(x: 0, y: 0, width: resultGraphView.frame.width, height: resultGraphView.frame.height)
     }
     
     //TableViewに関する設定一覧（セクション数）
-    func numberOfSectionsInTableView(tableView: UITableView) -> Int {
+    func numberOfSections(in tableView: UITableView) -> Int {
         return ScoreTableStruct.cellSectionCount
     }
     
     //TableViewに関する設定一覧（セクションのセル数）
-    func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return self.scoreArrayForCell.count
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return scoreArrayForCell.count
     }
     
     //TableViewに関する設定一覧（セルに関する設定）
-    func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         //Xibファイルを元にデータを作成する
-        let cell = tableView.dequeueReusableCellWithIdentifier("scoreCell") as? scoreCell
+        let cell = tableView.dequeueReusableCell(withIdentifier: "scoreCell") as? scoreCell
         
         //取得したデータを読み込ませる
         let scoreData: GameScore = self.scoreArrayForCell[indexPath.row] as! GameScore
         
-        cell!.scoreDate.text = ChangeDate.convertNSDateToString(scoreData.createDate)
+        cell!.scoreDate.text = ChangeDate.convertDateToString(scoreData.createDate)
         cell!.scoreAmount.text = "あなたの正解数：" + String(scoreData.correctAmount) + "問正解"
         cell!.scoreTime.text = "あなたのかかった時間：" + String(scoreData.timeCount) + "秒"
  
         //セルのアクセサリタイプと背景の設定
-        cell!.accessoryType = UITableViewCellAccessoryType.None
-        cell!.selectionStyle = UITableViewCellSelectionStyle.None
+        cell!.accessoryType = UITableViewCellAccessoryType.none
+        cell!.selectionStyle = UITableViewCellSelectionStyle.none
         
         return cell!
     }
     
     //TableView: セルの高さを返す
-    func tableView(tableView: UITableView, heightForRowAtIndexPath indexPath: NSIndexPath) -> CGFloat {
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return ScoreTableStruct.cellHeight
     }
     
@@ -185,51 +197,56 @@ class ScoreController: UIViewController ,UITableViewDelegate, UITableViewDataSou
     func fetchHistoryDataFromRealm() {
         
         //履歴データをフェッチしてTableViewへの一覧表示用のデータを作成
-        self.scoreArrayForCell.removeAllObjects()
+        scoreArrayForCell.removeAllObjects()
         let gameScores = GameScore.fetchAllGameScore()
         
         if gameScores.count != 0 {
             for gameScore in gameScores {
-                self.scoreArrayForCell.addObject(gameScore)
+                scoreArrayForCell.add(gameScore)
             }
         }
         
         //テーブルビューをリロード
-        self.reloadData()
+        reloadData()
         
         //セグメントコントロール位置の初期設定
-        self.analyticsSegmentControl.selectedSegmentIndex = 0
+        analyticsSegmentControl.selectedSegmentIndex = 0
     }
     
     //セグメントコントロールで表示するものを切り替える
-    @IBAction func changeDataDisplayAction(sender: AnyObject) {
+    @IBAction func changeDataDisplayAction(_ sender: AnyObject) {
         
         switch sender.selectedSegmentIndex {
             
             case 0:
-                self.resultHistoryTable.alpha = 1
-                self.resultGraphView.alpha = 0
+                resultHistoryTable.alpha = 1
+                resultGraphView.alpha = 0
                 break
             
             case 1:
-                self.resultHistoryTable.alpha = 0
-                self.resultGraphView.alpha = 1
+                resultHistoryTable.alpha = 0
+                resultGraphView.alpha = 1
                 break
             
             default:
-                self.resultHistoryTable.alpha = 1
-                self.resultGraphView.alpha = 0
+                resultHistoryTable.alpha = 1
+                resultGraphView.alpha = 0
                 break
         }
     }
     
     //このサンプルの解説のページをSafariで立ち上げる
-    @IBAction func goExplainHowtoAction(sender: AnyObject) {
+    @IBAction func goExplainHowtoAction(_ sender: AnyObject) {
         
         //Safariで立ち上げるようにする
-        let url = NSURL(string: "http://qiita.com/fumiyasac@github/items/18ae522885b5aa507ca3")
-        let app: UIApplication = UIApplication.sharedApplication()
-        app.openURL(url!)
+        let url = URL(string: "http://qiita.com/fumiyasac@github/items/18ae522885b5aa507ca3")
+        
+        if #available(iOS 10, *) {
+            UIApplication.shared.open(url!, options: [:])
+        } else {
+            let app: UIApplication = UIApplication.shared
+            app.openURL(url!)
+        }
     }
 
     override func didReceiveMemoryWarning() {
